@@ -38,42 +38,42 @@
 .size-letter.orient-portrait{width:816px;min-height:1054px;}
 .size-letter.orient-landscape{width:1054px;min-height:816px;}
 
-.report-head{display;grid-template-columns:1fr 1.45fr 1fr;gap:14px;align-items;}
-.logo-box{width:90px;height:80px;margin-inline-start;border:1px dashed #9dabb8;display;justify-content;align-items;overflow;background:#f8fafb;}
-.logo-box img{width:100%;height:100%;object-fit;}
+.report-head{display:grid;grid-template-columns:1fr 1.45fr 1fr;gap:14px;align-items:start;}
+.logo-box{width:90px;height:80px;margin-inline-start:auto;border:1px dashed #9dabb8;display:flex;justify-content:center;align-items:center;overflow:hidden;background:#f8fafb;}
+.logo-box img{width:100%;height:100%;object-fit:contain;}
 .divider-line{border-top:1px solid var(--line);margin:0;}
 
-#report-table{width:100%;border-collapse;table-layout;}
-#report-table th,#report-table td{border:1px solid var(--border-c,#52687a);padding:6px 7px;vertical-align;white-space;overflow-wrap;}
-#report-table th{font-weight:700;background(--head-c,#dce8f0);}
-.no-borders #report-table th,.no-borders #report-table td{border-color;}
-.editable-cell
+#report-table{width:100%;border-collapse:collapse;table-layout:auto;}
+#report-table th,#report-table td{border:1px solid var(--border-c,#52687a);padding:6px 7px;vertical-align:middle;white-space:normal;overflow-wrap:break-word;}
+#report-table th{font-weight:700;background:var(--head-c,#dce8f0);}
+.no-borders #report-table th,.no-borders #report-table td{border-color:transparent;}
+.editable-cell{cursor:text;}
 
-.sig-row td{border !important;padding:0;}
+.sig-row td{border:none !important;padding:0;}
 .signature-line{border-top:1px solid #283b4a;width:82%;margin:26px auto 6px;}
 .footer-meta{font-size:11px;color:#4b5b69;}
 
 .tiny-scroll::-webkit-scrollbar{width:8px;height:8px;}
 .tiny-scroll::-webkit-scrollbar-thumb{background:#b7c4cf;border-radius:9px;}
-.modal-backdrop{background(10,27,43,.62);}
+.modal-backdrop{background:rgba(10,27,43,.62);}
 
 @media (max-width:1023px){
-#paper-scale-wrap{transform(.72);transform-origin center;}
+#paper-scale-wrap{transform:scale(.72);transform-origin:center;}
 }
 @media (max-width:640px){
-#paper-scale-wrap{transform(.42);transform-origin center;}
+#paper-scale-wrap{transform:scale(.42);transform-origin:center;}
 }
 
 /* ===== PRINT ===== */
 @media print{
-body *{visibility;}
-#print-root, #print-root *{visibility;}
-#print-root{position;inset:0;margin:0 !important;padding:0 !important;}
-#print-instruction-bar{display !important;}
-#print-root .paper{box-shadow !important;transform !important;margin:0 !important;width !important;min-height:0 !important;}
-thead{display;}
-tfoot{display;}
-tr{page-break-inside;}
+body *{visibility:hidden;}
+#print-root, #print-root *{visibility:visible;}
+#print-root{position:fixed;inset:0;margin:0 !important;padding:0 !important;}
+#print-instruction-bar{display:none !important;}
+#print-root .paper{box-shadow:none !important;transform:none !important;margin:0 !important;width:auto !important;min-height:0 !important;}
+thead{display:table-header-group;}
+tfoot{display:table-footer-group;}
+tr{page-break-inside:avoid;}
 }
 </style>
 
@@ -107,7 +107,7 @@ tr{page-break-inside;}
         <div class="bg-white p-5 rounded-xl shadow-2xl text-slate-800 rotate-1">
           <div class="border border-slate-300 rounded-lg p-4">
             <div class="flex justify-between border-b pb-3">
-              <div class="text-xs leading-6 text-slate-600">مديرية<br>إدارة<br>مدرسة</div>
+              <div class="text-xs leading-6 text-slate-600">مديرية: التربية والتعليم بالفيوم<br>إدارة: ابشواي التعليمية<br>مدرسة: النصارية الإعدادية</div>
               <div class="text-center">
                 <div class="font-bold text-lg">كشف بيانات الموظفين</div>
                 <div class="text-xs text-slate-500">للعام الإداري الحالي</div>
@@ -233,9 +233,9 @@ tr{page-break-inside;}
     <!-- STEP 2 -->
     <section class="settings-step hidden-view" data-settings="2">
       <p class="text-sm text-slate-600 leading-7 mb-4">عدّل بيانات الجهة والعنوان والشعار، وستظهر التغييرات مباشرة في المعاينة.</p>
-      <label class="block text-sm font-bold mb-2" for="right-line-1">السطر الأول (يمين)</label><input id="right-line-1" value="محافظة: صنعاء" class="w-full border rounded-lg p-2.5">
-      <label class="block text-sm font-bold mt-3 mb-2" for="right-line-2">السطر الثاني</label><input id="right-line-2" value="مديرية: ..." class="w-full border rounded-lg p-2.5">
-      <label class="block text-sm font-bold mt-3 mb-2" for="right-line-3">السطر الثالث</label><input id="right-line-3" value="الجهة أو القسم: الشؤون الإدارية" class="w-full border rounded-lg p-2.5">
+      <label class="block text-sm font-bold mb-2" for="right-line-1">المديرية</label><input id="right-line-1" value="مديرية: ..." class="w-full border rounded-lg p-2.5">
+      <label class="block text-sm font-bold mt-3 mb-2" for="right-line-2">الإدارة</label><input id="right-line-2" value="إدارة: ..." class="w-full border rounded-lg p-2.5">
+      <label class="block text-sm font-bold mt-3 mb-2" for="right-line-3">المدرسة</label><input id="right-line-3" value="مدرسة: ..." class="w-full border rounded-lg p-2.5">
       <label class="block text-sm font-bold mt-4 mb-2" for="report-title-input">عنوان التقرير</label><input id="report-title-input" value="كشف بيانات الموظفين" class="w-full border rounded-lg p-2.5">
       <label class="block text-sm font-bold mt-3 mb-2" for="report-subtitle-input">عنوان فرعي اختياري</label><input id="report-subtitle-input" value="للعام الإداري الحالي" class="w-full border rounded-lg p-2.5">
       <div class="grid grid-cols-2 gap-3 mt-3">
@@ -352,7 +352,7 @@ const state = {
   orientation:'portrait', size:'a4', margin:15,
   fontFamily:'Cairo', fontSize:14, fontColor:'#182433',
   showBorders:true, borderColor:'#52687a', borderWidth:1,
-  rightLines:['محافظة: صنعاء','مديرية: ...','الجهة أو القسم: الشؤون الإدارية'],
+  rightLines:['مديرية: ...','إدارة: ...','مدرسة: ...'],
   title:'كشف بيانات الموظفين', subtitle:'للعام الإداري الحالي',
   titleAlign:'center', titleSize:22,
   logoSrc:null, logoVisible:true,
