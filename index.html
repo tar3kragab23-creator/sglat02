@@ -1,0 +1,863 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>مصمم الجداول والتقارير</title>
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.577.0/dist/umd/lucide.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#112b46; --navy-2:#183e61; --ink:#182433; --mist:#eef2f5;
+    --line:#8fa2b3; --paper:#ffffff; --accent:#1f5d8a; --ok:#2f7a5b;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:"Cairo",sans-serif;color:var(--ink);background:#eef2f5;}
+  button,input,select{font:inherit;}
+  button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #75a9cf;outline-offset:2px;}
+  .hidden-view{display:none !important;}
+  .home-hero{background:linear-gradient(135deg,#102941 0%,#183e61 65%,#245879 100%);}
+  .step-dot{width:30px;height:30px;border-radius:999px;display:flex;align-items:center;justify-content:center;border:1px solid #bdcbd7;color:#718096;background:#fff;font-size:12px;font-weight:700;flex-shrink:0;}
+  .step-item.active .step-dot{background:var(--navy);border-color:var(--navy);color:#fff;box-shadow:0 0 0 4px #dce9f2;}
+  .step-item.done .step-dot{background:var(--ok);border-color:var(--ok);color:#fff;}
+  .step-item.active .step-name{color:var(--navy);font-weight:800;}
+  .step-item{background:none;border:0;cursor:pointer;padding:4px 2px;}
+  .paper-stage{background-color:#dbe3e9;background-image:radial-gradient(#b8c6d0 0.8px,transparent .8px);background-size:15px 15px;}
+
+  /* ===== paper sizes (px @ 96dpi) ===== */
+  .paper{background:#fff;box-shadow:0 10px 34px rgba(15,35,52,.20);transform-origin:top center;}
+  .size-a4.orient-portrait{width:794px;min-height:1123px;}
+  .size-a4.orient-landscape{width:1123px;min-height:794px;}
+  .size-a3.orient-portrait{width:1123px;min-height:1587px;}
+  .size-a3.orient-landscape{width:1587px;min-height:1123px;}
+  .size-letter.orient-portrait{width:816px;min-height:1054px;}
+  .size-letter.orient-landscape{width:1054px;min-height:816px;}
+
+  .report-head{display:grid;grid-template-columns:1fr 1.45fr 1fr;gap:14px;align-items:start;}
+  .logo-box{width:90px;height:80px;margin-inline-start:auto;border:1px dashed #9dabb8;display:flex;justify-content:center;align-items:center;overflow:hidden;background:#f8fafb;}
+  .logo-box img{width:100%;height:100%;object-fit:contain;}
+  .divider-line{border-top:1px solid var(--line);margin:0;}
+
+  #report-table{width:100%;border-collapse:collapse;table-layout:auto;}
+  #report-table th,#report-table td{border:1px solid var(--border-c,#52687a);padding:6px 7px;vertical-align:middle;white-space:normal;overflow-wrap:anywhere;}
+  #report-table th{font-weight:700;background:var(--head-c,#dce8f0);}
+  .no-borders #report-table th,.no-borders #report-table td{border-color:transparent;}
+  .editable-cell:focus{outline:2px solid #5a9cc5;outline-offset:-2px;background:#f7fcff;}
+
+  .sig-row td{border:none !important;padding:0;}
+  .signature-line{border-top:1px solid #283b4a;width:82%;margin:26px auto 6px;}
+  .footer-meta{font-size:11px;color:#4b5b69;}
+
+  .tiny-scroll::-webkit-scrollbar{width:8px;height:8px;}
+  .tiny-scroll::-webkit-scrollbar-thumb{background:#b7c4cf;border-radius:9px;}
+  .modal-backdrop{background:rgba(10,27,43,.62);}
+
+  @media (max-width:1023px){
+    #paper-scale-wrap{transform:scale(.72);transform-origin:top center;}
+  }
+  @media (max-width:640px){
+    #paper-scale-wrap{transform:scale(.42);transform-origin:top center;}
+  }
+
+  /* ===== PRINT ===== */
+  @media print{
+    body *{visibility:hidden;}
+    #print-root, #print-root *{visibility:visible;}
+    #print-root{position:absolute;inset:0;margin:0 !important;padding:0 !important;}
+    #print-instruction-bar{display:none !important;}
+    #print-root .paper{box-shadow:none !important;transform:none !important;margin:0 !important;width:auto !important;min-height:0 !important;}
+    thead{display:table-header-group;}
+    tfoot{display:table-footer-group;}
+    tr{page-break-inside:avoid;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ HOME VIEW ============ -->
+<section id="home-view">
+  <header class="home-hero text-white">
+    <div class="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between gap-5">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center"><i data-lucide="table-properties" class="w-5 h-5"></i></div>
+        <h1 class="font-extrabold text-lg">مصمم الجداول والتقارير</h1>
+      </div>
+      <span class="text-xs px-3 py-1.5 rounded-full border border-white/20 bg-white/10">نسخة تجريبية</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="home-hero text-white">
+      <div class="max-w-7xl mx-auto px-6 pt-12 pb-20 grid lg:grid-cols-2 gap-12 items-center">
+        <div>
+          <p class="text-sm font-bold text-sky-200 mb-4">أداة رسمية لإنشاء الكشوفات والتقارير</p>
+          <h2 class="text-4xl md:text-5xl leading-tight font-extrabold max-w-xl">صمّم كشفك أو تقريرك الرسمي وصدّره جاهزًا للطباعة</h2>
+          <p class="text-lg text-slate-200 leading-8 mt-6 max-w-xl">مناسب للجهات الحكومية والمدارس والشركات: أضف ديباجة الجهة، جدولًا بأي عدد من الأعمدة والصفوف، وتوقيعات الاعتماد، ثم اطبع أو صدّر PDF مباشرة.</p>
+          <button id="start-button" type="button" class="mt-8 bg-white text-slate-900 font-bold px-6 py-3 rounded-lg shadow-lg hover:bg-slate-100 transition flex items-center gap-2">
+            <i data-lucide="plus-circle" class="w-5 h-5"></i><span>ابدأ تصميم جدول جديد</span>
+          </button>
+        </div>
+        <div class="bg-white p-5 rounded-xl shadow-2xl text-slate-800 rotate-1">
+          <div class="border border-slate-300 rounded-lg p-4">
+            <div class="flex justify-between border-b pb-3">
+              <div class="text-xs leading-6 text-slate-600">محافظة: صنعاء<br>مديرية: العاصمة<br>الجهة: الشؤون الإدارية</div>
+              <div class="text-center">
+                <div class="font-bold text-lg">كشف بيانات الموظفين</div>
+                <div class="text-xs text-slate-500">للعام الإداري الحالي</div>
+              </div>
+              <div class="w-12 h-12 border rounded flex items-center justify-center"><i data-lucide="building-2" class="w-6 h-6 text-slate-500"></i></div>
+            </div>
+            <div class="grid grid-cols-5 text-center text-xs mt-4 border-t border-r">
+              <b class="p-2 border-l border-b bg-slate-100">م</b><b class="p-2 border-l border-b bg-slate-100">الاسم</b><b class="p-2 border-l border-b bg-slate-100">الرقم</b><b class="p-2 border-l border-b bg-slate-100">القسم</b><b class="p-2 border-l border-b bg-slate-100">ملاحظات</b>
+              <span class="p-2 border-l border-b">١</span><span class="p-2 border-l border-b">أحمد علي</span><span class="p-2 border-l border-b">١٠٢٤</span><span class="p-2 border-l border-b">المالية</span><span class="p-2 border-l border-b">—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="max-w-7xl mx-auto px-6 py-14">
+      <h2 class="text-2xl font-extrabold text-slate-800">كيف يعمل الموقع</h2>
+      <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+        <article class="bg-white border border-slate-200 rounded-xl p-5"><i data-lucide="file-cog" class="text-sky-700 mb-3"></i>
+          <h3 class="font-bold">إعداد الصفحة</h3>
+          <p class="text-sm text-slate-600 leading-7 mt-2">اختر اتجاه الورقة (رأسي/أفقي) وحجمها (A4، A3، Letter) وهوامشها قبل البدء.</p>
+        </article>
+        <article class="bg-white border border-slate-200 rounded-xl p-5"><i data-lucide="table-2" class="text-sky-700 mb-3"></i>
+          <h3 class="font-bold">إنشاء الجدول</h3>
+          <p class="text-sm text-slate-600 leading-7 mt-2">حدّد عدد الأعمدة والصفوف، واكتب البيانات مباشرة أو الصقها من إكسل.</p>
+        </article>
+        <article class="bg-white border border-slate-200 rounded-xl p-5"><i data-lucide="file-up" class="text-sky-700 mb-3"></i>
+          <h3 class="font-bold">استيراد من Excel</h3>
+          <p class="text-sm text-slate-600 leading-7 mt-2">ارفع ملف XLSX أو CSV وستُحوَّل بياناته تلقائيًا إلى صفوف وأعمدة قابلة للتعديل.</p>
+        </article>
+        <article class="bg-white border border-slate-200 rounded-xl p-5"><i data-lucide="file-down" class="text-sky-700 mb-3"></i>
+          <h3 class="font-bold">التصدير والطباعة</h3>
+          <p class="text-sm text-slate-600 leading-7 mt-2">صدّر ملف PDF عالي الجودة أو اطبع مباشرة، بنفس اتجاه وحجم الورقة المختارين.</p>
+        </article>
+      </div>
+    </section>
+  </main>
+</section>
+
+<!-- ============ EDITOR VIEW ============ -->
+<section id="editor-view" class="hidden-view">
+  <header id="editor-topbar" class="bg-white border-b border-slate-200 sticky top-0 z-20">
+    <div class="max-w-[1600px] mx-auto px-4 py-3 flex flex-wrap gap-3 items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 bg-slate-900 text-white rounded-lg flex items-center justify-center"><i data-lucide="table-properties" class="w-5 h-5"></i></div>
+        <h2 class="font-extrabold text-slate-800">محرر التصميم</h2>
+      </div>
+      <nav aria-label="خطوات تصميم التقرير" class="flex flex-wrap justify-center gap-2 sm:gap-4">
+        <button type="button" class="step-item active flex items-center gap-2" data-step="1"><span class="step-dot">1</span><span class="step-name text-xs">إعداد الصفحة</span></button>
+        <button type="button" class="step-item flex items-center gap-2" data-step="2"><span class="step-dot">2</span><span class="step-name text-xs">رأس الصفحة</span></button>
+        <button type="button" class="step-item flex items-center gap-2" data-step="3"><span class="step-dot">3</span><span class="step-name text-xs">تصميم الجدول</span></button>
+        <button type="button" class="step-item flex items-center gap-2" data-step="4"><span class="step-dot">4</span><span class="step-name text-xs">تذييل الصفحة</span></button>
+        <button type="button" class="step-item flex items-center gap-2" data-step="5"><span class="step-dot">5</span><span class="step-name text-xs">المعاينة والتصدير</span></button>
+      </nav>
+      <div class="flex gap-2">
+        <button id="home-button" type="button" class="text-sm border rounded-lg px-3 py-2 flex items-center gap-1"><i data-lucide="home" class="w-4 h-4"></i> الرئيسية</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-[1600px] mx-auto p-4 grid lg:grid-cols-[350px_1fr] gap-4">
+    <!-- SETTINGS PANEL -->
+    <aside id="settings-panel" class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden self-start">
+      <div class="p-5 border-b bg-slate-50">
+        <h2 id="panel-title" class="font-extrabold text-slate-800">إعداد الصفحة</h2>
+        <p id="panel-helper" class="text-xs text-slate-500 mt-1">اضبط خصائص الورقة قبل البدء.</p>
+      </div>
+      <div class="p-5 max-h-[70vh] overflow-y-auto tiny-scroll">
+
+        <!-- STEP 1 -->
+        <section class="settings-step" data-settings="1">
+          <label class="block text-sm font-bold mb-2" for="page-orientation">اتجاه الورقة</label>
+          <select id="page-orientation" class="w-full border rounded-lg p-2.5">
+            <option value="portrait">رأسي Portrait</option>
+            <option value="landscape">أفقي Landscape</option>
+          </select>
+          <label class="block text-sm font-bold mt-4 mb-2" for="page-size">حجم الورقة</label>
+          <select id="page-size" class="w-full border rounded-lg p-2.5">
+            <option value="a4">A4</option>
+            <option value="a3">A3</option>
+            <option value="letter">Letter</option>
+          </select>
+          <label class="block text-sm font-bold mt-4 mb-2" for="page-margin">هوامش الصفحة (مم)</label>
+          <select id="page-margin" class="w-full border rounded-lg p-2.5">
+            <option value="10">ضيقة (10مم)</option>
+            <option value="15" selected>متوسطة (15مم)</option>
+            <option value="22">واسعة (22مم)</option>
+          </select>
+          <div class="grid grid-cols-2 gap-3 mt-4">
+            <div><label class="block text-sm font-bold mb-2" for="font-family">نوع الخط</label>
+              <select id="font-family" class="w-full border rounded-lg p-2.5">
+                <option value="Cairo">Cairo</option>
+                <option value="Tahoma">Tahoma</option>
+                <option value="Arial">Arial</option>
+              </select>
+            </div>
+            <div><label class="block text-sm font-bold mb-2" for="font-size">حجم الخط</label><input id="font-size" type="number" value="14" min="10" max="24" class="w-full border rounded-lg p-2.5"></div>
+          </div>
+          <label class="block text-sm font-bold mt-4 mb-2" for="font-color">لون الخط</label><input id="font-color" type="color" value="#182433" class="w-full h-11 border rounded-lg p-1">
+          <label class="flex items-center gap-2 mt-4 text-sm"><input id="show-borders" type="checkbox" checked class="accent-slate-800 w-4 h-4"> إظهار حدود الجدول</label>
+          <div class="grid grid-cols-2 gap-3 mt-4">
+            <div><label class="block text-sm font-bold mb-2" for="border-color">لون الحدود</label><input id="border-color" type="color" value="#52687a" class="w-full h-11 border rounded-lg p-1"></div>
+            <div><label class="block text-sm font-bold mb-2" for="border-width">السماكة</label>
+              <select id="border-width" class="w-full border rounded-lg p-2.5">
+                <option value="1">رفيعة</option><option value="2">متوسطة</option><option value="3">سميكة</option>
+              </select>
+            </div>
+          </div>
+        </section>
+
+        <!-- STEP 2 -->
+        <section class="settings-step hidden-view" data-settings="2">
+          <p class="text-sm text-slate-600 leading-7 mb-4">عدّل بيانات الجهة والعنوان والشعار، وستظهر التغييرات مباشرة في المعاينة.</p>
+          <label class="block text-sm font-bold mb-2" for="right-line-1">السطر الأول (يمين)</label><input id="right-line-1" value="محافظة: صنعاء" class="w-full border rounded-lg p-2.5">
+          <label class="block text-sm font-bold mt-3 mb-2" for="right-line-2">السطر الثاني</label><input id="right-line-2" value="مديرية: ..." class="w-full border rounded-lg p-2.5">
+          <label class="block text-sm font-bold mt-3 mb-2" for="right-line-3">السطر الثالث</label><input id="right-line-3" value="الجهة أو القسم: الشؤون الإدارية" class="w-full border rounded-lg p-2.5">
+          <label class="block text-sm font-bold mt-4 mb-2" for="report-title-input">عنوان التقرير</label><input id="report-title-input" value="كشف بيانات الموظفين" class="w-full border rounded-lg p-2.5">
+          <label class="block text-sm font-bold mt-3 mb-2" for="report-subtitle-input">عنوان فرعي اختياري</label><input id="report-subtitle-input" value="للعام الإداري الحالي" class="w-full border rounded-lg p-2.5">
+          <div class="grid grid-cols-2 gap-3 mt-3">
+            <div><label class="block text-sm font-bold mb-2" for="title-align">محاذاة العنوان</label>
+              <select id="title-align" class="w-full border rounded-lg p-2.5">
+                <option value="center">توسيط</option><option value="right">يمين</option><option value="left">يسار</option>
+              </select>
+            </div>
+            <div><label class="block text-sm font-bold mb-2" for="title-size">حجم العنوان</label><input id="title-size" type="number" value="22" min="14" max="36" class="w-full border rounded-lg p-2.5"></div>
+          </div>
+          <label class="block text-sm font-bold mt-4 mb-2" for="logo-upload">شعار الجهة</label><input id="logo-upload" type="file" accept="image/*" class="w-full text-sm border rounded-lg p-2">
+          <div class="grid grid-cols-2 gap-2 mt-3">
+            <button id="remove-logo" type="button" class="rounded-lg p-2 text-sm border">حذف الشعار</button>
+            <button id="toggle-logo" type="button" class="rounded-lg p-2 text-sm bg-slate-100">إخفاء/إظهار</button>
+          </div>
+        </section>
+
+        <!-- STEP 3 -->
+        <section class="settings-step hidden-view" data-settings="3">
+          <div class="grid grid-cols-2 gap-3">
+            <div><label class="block text-sm font-bold mb-2" for="column-count">عدد الأعمدة</label><input id="column-count" type="number" value="5" min="1" max="15" class="w-full border rounded-lg p-2.5"></div>
+            <div><label class="block text-sm font-bold mb-2" for="row-count">الصفوف</label><input id="row-count" type="number" value="8" min="1" max="120" class="w-full border rounded-lg p-2.5"></div>
+          </div>
+          <div class="grid grid-cols-2 gap-2 mt-3">
+            <button id="apply-dimensions" type="button" class="rounded-lg p-2.5 text-sm font-bold bg-slate-800 text-white">تطبيق الأبعاد</button>
+            <button id="clear-table" type="button" class="rounded-lg p-2.5 text-sm border">مسح البيانات</button>
+          </div>
+          <hr class="my-5">
+          <label class="block text-sm font-bold mb-2" for="header-bg">لون صف العناوين</label><input id="header-bg" type="color" value="#dce8f0" class="w-full h-11 border rounded-lg p-1">
+          <label class="block text-sm font-bold mt-4 mb-2" for="cell-align">محاذاة محتوى الخلايا</label>
+          <select id="cell-align" class="w-full border rounded-lg p-2.5">
+            <option value="right">يمين</option><option value="center">وسط</option><option value="left">يسار</option>
+          </select>
+          <label class="flex items-center gap-2 mt-4 text-sm"><input id="autofit-cells" type="checkbox" checked class="accent-slate-800 w-4 h-4"> ملاءمة حجم الخانات تلقائيًا مع محتواها (Autofit)</label>
+          <label class="flex items-center gap-2 mt-3 text-sm"><input id="auto-number" type="checkbox" checked class="accent-slate-800 w-4 h-4"> إضافة ترقيم تلقائي للصفوف</label>
+          <hr class="my-5">
+          <p class="text-sm font-bold mb-2">تكرار العناصر عند الطباعة/التصدير</p>
+          <label class="flex items-center gap-2 mt-1 text-sm"><input id="repeat-masthead" type="checkbox" checked class="accent-slate-800 w-4 h-4"> تكرار الديباجة العلوية (رأس الصفحة كاملًا) في كل صفحة</label>
+          <label class="flex items-center gap-2 mt-3 text-sm"><input id="repeat-header" type="checkbox" checked class="accent-slate-800 w-4 h-4"> تكرار رأس الجدول (أسماء الأعمدة) في كل صفحة</label>
+          <label class="flex items-center gap-2 mt-3 text-sm"><input id="repeat-signatures" type="checkbox" class="accent-slate-800 w-4 h-4"> تكرار التوقيعات أسفل كل صفحة</label>
+          <hr class="my-5">
+          <label class="block text-sm font-bold mb-2" for="excel-file">استيراد من Excel أو CSV</label><input id="excel-file" type="file" accept=".xlsx,.xls,.csv" class="w-full text-sm border rounded-lg p-2">
+          <button id="import-excel" type="button" class="w-full mt-3 rounded-lg p-2.5 text-sm font-bold border">استيراد من Excel</button>
+          <div id="import-preview" class="hidden mt-4 text-xs border rounded-lg overflow-auto max-h-44"></div>
+          <button id="apply-import" type="button" class="hidden w-full mt-3 rounded-lg p-2.5 text-sm font-bold bg-slate-800 text-white">اعتماد البيانات المستوردة</button>
+          <p class="text-xs text-slate-500 leading-6 mt-4">يمكنك أيضًا نسخ خلايا من إكسل أو Google Sheets ولصقها مباشرة داخل الجدول في المعاينة.</p>
+        </section>
+
+        <!-- STEP 4 -->
+        <section class="settings-step hidden-view" data-settings="4">
+          <label class="flex items-center gap-2 text-sm font-bold"><input id="show-footer" type="checkbox" checked class="accent-slate-800 w-4 h-4"> إظهار التذييل والتوقيعات</label>
+          <div id="footer-controls">
+            <label class="block text-sm font-bold mt-4 mb-2" for="sig-right">التوقيع الأول (يمين)</label><input id="sig-right" value="إعداد: __________" class="w-full border rounded-lg p-2.5">
+            <label class="block text-sm font-bold mt-3 mb-2" for="sig-center">التوقيع الثاني (وسط)</label><input id="sig-center" value="مراجعة: __________" class="w-full border rounded-lg p-2.5">
+            <label class="block text-sm font-bold mt-3 mb-2" for="sig-left">التوقيع الثالث (يسار)</label><input id="sig-left" value="اعتماد: __________" class="w-full border rounded-lg p-2.5">
+            <label class="flex items-center gap-2 mt-4 text-sm"><input id="signature-lines" type="checkbox" checked class="accent-slate-800 w-4 h-4"> إضافة خطوط للتوقيع</label>
+            <label class="flex items-center gap-2 mt-3 text-sm"><input id="show-date" type="checkbox" checked class="accent-slate-800 w-4 h-4"> إظهار التاريخ ورقم الصفحة</label>
+          </div>
+        </section>
+
+        <!-- STEP 5 -->
+        <section class="settings-step hidden-view" data-settings="5">
+          <div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
+            <i data-lucide="badge-check" class="text-emerald-600 mb-2"></i>
+            <h3 class="font-extrabold">جاهز للمعاينة والتصدير</h3>
+            <p class="text-sm text-slate-600 leading-7 mt-2">تحقق من الشكل النهائي، ثم اطبع مباشرة أو صدّر ملف PDF بنفس اتجاه وحجم الورقة الذي اخترته.</p>
+          </div>
+          <button id="print-button" type="button" class="w-full mt-4 rounded-lg p-3 text-sm font-bold border flex items-center justify-center gap-2" aria-label="طباعة التقرير">
+            <i data-lucide="printer" class="w-4 h-4"></i> طباعة
+          </button>
+          <button id="export-pdf-button" type="button" class="w-full mt-3 rounded-lg p-3 text-sm font-bold bg-slate-800 text-white flex items-center justify-center gap-2">
+            <i data-lucide="file-down" class="w-4 h-4"></i> تصدير PDF
+          </button>
+          <button id="save-design-button" type="button" class="w-full mt-3 rounded-lg p-3 text-sm font-bold border flex items-center justify-center gap-2">
+            <i data-lucide="save" class="w-4 h-4"></i> حفظ التصميم
+          </button>
+          <button id="new-design-button" type="button" class="w-full mt-3 rounded-lg p-3 text-sm font-bold border flex items-center justify-center gap-2">
+            <i data-lucide="rotate-ccw" class="w-4 h-4"></i> بدء تصميم جديد
+          </button>
+        </section>
+      </div>
+    </aside>
+
+    <!-- PREVIEW -->
+    <section class="min-w-0">
+      <div id="status-message" aria-live="polite" class="hidden mb-3 rounded-lg border px-4 py-3 text-sm"></div>
+      <div class="flex justify-between items-center mb-3">
+        <div class="flex gap-2">
+          <button id="prev-step" type="button" class="text-sm border rounded-lg px-4 py-2">السابق</button>
+          <button id="next-step" type="button" class="text-sm rounded-lg px-4 py-2 bg-slate-800 text-white">التالي</button>
+        </div>
+        <span id="pagecount-note" class="text-xs text-slate-500"></span>
+      </div>
+      <div id="preview-stage" class="paper-stage rounded-xl border border-slate-300 min-h-[650px] p-6 overflow-auto flex justify-center items-start">
+        <div id="paper-scale-wrap">
+          <!-- live-editable paper (screen only) -->
+          <article id="paper" class="paper size-a4 orient-portrait" aria-label="معاينة التقرير"></article>
+        </div>
+      </div>
+    </section>
+  </main>
+</section>
+
+<!-- print target, built fresh right before print/export -->
+<div id="print-root" class="hidden-view"></div>
+
+<script>
+(function(){
+'use strict';
+
+const state = {
+  orientation:'portrait', size:'a4', margin:15,
+  fontFamily:'Cairo', fontSize:14, fontColor:'#182433',
+  showBorders:true, borderColor:'#52687a', borderWidth:1,
+  rightLines:['محافظة: صنعاء','مديرية: ...','الجهة أو القسم: الشؤون الإدارية'],
+  title:'كشف بيانات الموظفين', subtitle:'للعام الإداري الحالي',
+  titleAlign:'center', titleSize:22,
+  logoSrc:null, logoVisible:true,
+  cols:5, rows:8,
+  headers:['م','الاسم','الرقم الوظيفي','القسم','الملاحظات'],
+  data:[],
+  headerBg:'#dce8f0', cellAlign:'right', autofit:true, autoNumber:true,
+  repeatMasthead:true, repeatHeader:true, repeatSignatures:false,
+  showFooter:true, sigRight:'إعداد: __________', sigCenter:'مراجعة: __________', sigLeft:'اعتماد: __________',
+  signatureLines:true, showDate:true,
+};
+
+function seedData(){
+  state.data = [];
+  for(let r=0;r<state.rows;r++){
+    const row = [];
+    for(let c=0;c<state.cols;c++) row.push('');
+    state.data.push(row);
+  }
+}
+seedData();
+
+const $ = (id)=>document.getElementById(id);
+
+/* ---------- navigation ---------- */
+$('start-button').addEventListener('click', ()=>{
+  $('home-view').classList.add('hidden-view');
+  $('editor-view').classList.remove('hidden-view');
+  renderPaper();
+});
+$('home-button').addEventListener('click', ()=>{
+  $('editor-view').classList.add('hidden-view');
+  $('home-view').classList.remove('hidden-view');
+});
+
+let currentStep = 1;
+const panelTitles = {1:['إعداد الصفحة','اضبط خصائص الورقة قبل البدء.'],
+  2:['رأس الصفحة','عدّل بيانات الجهة والعنوان والشعار.'],
+  3:['تصميم الجدول','أنشئ الأعمدة والصفوف وأدخل البيانات.'],
+  4:['تذييل الصفحة','أضف توقيعات الاعتماد.'],
+  5:['المعاينة والتصدير','راجع النتيجة النهائية ثم صدّرها.']};
+
+function goToStep(n){
+  n = Math.max(1, Math.min(5, n));
+  currentStep = n;
+  document.querySelectorAll('.settings-step').forEach(s=>s.classList.toggle('hidden-view', Number(s.dataset.settings)!==n));
+  document.querySelectorAll('.step-item').forEach(s=>{
+    const sn = Number(s.dataset.step);
+    s.classList.toggle('active', sn===n);
+    s.classList.toggle('done', sn<n);
+  });
+  $('panel-title').textContent = panelTitles[n][0];
+  $('panel-helper').textContent = panelTitles[n][1];
+}
+document.querySelectorAll('.step-item').forEach(btn=>{
+  btn.addEventListener('click', ()=>goToStep(Number(btn.dataset.step)));
+});
+$('next-step').addEventListener('click', ()=>goToStep(currentStep+1));
+$('prev-step').addEventListener('click', ()=>goToStep(currentStep-1));
+
+/* ---------- step 1 bindings ---------- */
+$('page-orientation').addEventListener('change', e=>{state.orientation=e.target.value; renderPaper();});
+$('page-size').addEventListener('change', e=>{state.size=e.target.value; renderPaper();});
+$('page-margin').addEventListener('change', e=>{state.margin=Number(e.target.value); renderPaper();});
+$('font-family').addEventListener('change', e=>{state.fontFamily=e.target.value; renderPaper();});
+$('font-size').addEventListener('input', e=>{state.fontSize=Number(e.target.value)||14; renderPaper();});
+$('font-color').addEventListener('input', e=>{state.fontColor=e.target.value; renderPaper();});
+$('show-borders').addEventListener('change', e=>{state.showBorders=e.target.checked; renderPaper();});
+$('border-color').addEventListener('input', e=>{state.borderColor=e.target.value; renderPaper();});
+$('border-width').addEventListener('change', e=>{state.borderWidth=Number(e.target.value); renderPaper();});
+
+/* ---------- step 2 bindings ---------- */
+['right-line-1','right-line-2','right-line-3'].forEach((id,i)=>{
+  $(id).addEventListener('input', e=>{state.rightLines[i]=e.target.value; renderPaper();});
+});
+$('report-title-input').addEventListener('input', e=>{state.title=e.target.value; renderPaper();});
+$('report-subtitle-input').addEventListener('input', e=>{state.subtitle=e.target.value; renderPaper();});
+$('title-align').addEventListener('change', e=>{state.titleAlign=e.target.value; renderPaper();});
+$('title-size').addEventListener('input', e=>{state.titleSize=Number(e.target.value)||22; renderPaper();});
+$('logo-upload').addEventListener('change', e=>{
+  const f = e.target.files[0]; if(!f) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{state.logoSrc=reader.result; state.logoVisible=true; renderPaper();};
+  reader.readAsDataURL(f);
+});
+$('remove-logo').addEventListener('click', ()=>{state.logoSrc=null; $('logo-upload').value=''; renderPaper();});
+$('toggle-logo').addEventListener('click', ()=>{state.logoVisible=!state.logoVisible; renderPaper();});
+
+/* ---------- step 3 bindings ---------- */
+$('apply-dimensions').addEventListener('click', ()=>{
+  const newCols = Math.max(1, Math.min(15, Number($('column-count').value)||1));
+  const newRows = Math.max(1, Math.min(120, Number($('row-count').value)||1));
+  const oldHeaders = state.headers.slice();
+  const oldData = state.data;
+  const headers = [];
+  for(let c=0;c<newCols;c++) headers.push(oldHeaders[c] || ('عمود '+(c+1)));
+  const data = [];
+  for(let r=0;r<newRows;r++){
+    const row = [];
+    for(let c=0;c<newCols;c++) row.push((oldData[r] && oldData[r][c]) || '');
+    data.push(row);
+  }
+  state.cols = newCols; state.rows = newRows; state.headers = headers; state.data = data;
+  renderPaper();
+  showStatus('تم تطبيق أبعاد الجدول.', 'ok');
+});
+$('clear-table').addEventListener('click', ()=>{
+  state.data = state.data.map(row=>row.map(()=>''));
+  renderPaper();
+});
+$('header-bg').addEventListener('input', e=>{state.headerBg=e.target.value; renderPaper();});
+$('cell-align').addEventListener('change', e=>{state.cellAlign=e.target.value; renderPaper();});
+$('autofit-cells').addEventListener('change', e=>{state.autofit=e.target.checked; renderPaper();});
+$('auto-number').addEventListener('change', e=>{state.autoNumber=e.target.checked; renderPaper();});
+$('repeat-masthead').addEventListener('change', e=>{state.repeatMasthead=e.target.checked;});
+$('repeat-header').addEventListener('change', e=>{state.repeatHeader=e.target.checked;});
+$('repeat-signatures').addEventListener('change', e=>{state.repeatSignatures=e.target.checked;});
+
+/* ---------- step 4 bindings ---------- */
+$('show-footer').addEventListener('change', e=>{state.showFooter=e.target.checked; $('footer-controls').classList.toggle('hidden-view', !e.target.checked); renderPaper();});
+$('sig-right').addEventListener('input', e=>{state.sigRight=e.target.value; renderPaper();});
+$('sig-center').addEventListener('input', e=>{state.sigCenter=e.target.value; renderPaper();});
+$('sig-left').addEventListener('input', e=>{state.sigLeft=e.target.value; renderPaper();});
+$('signature-lines').addEventListener('change', e=>{state.signatureLines=e.target.checked; renderPaper();});
+$('show-date').addEventListener('change', e=>{state.showDate=e.target.checked; renderPaper();});
+
+/* ---------- excel import ---------- */
+let pendingImport = null;
+$('import-excel').addEventListener('click', ()=>{
+  const file = $('excel-file').files[0];
+  if(!file){ showStatus('الرجاء اختيار ملف Excel أو CSV أولًا.', 'err'); return; }
+  const reader = new FileReader();
+  reader.onload = (e)=>{
+    try{
+      const wb = XLSX.read(e.target.result, {type:'binary'});
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
+      if(!rows.length){ showStatus('الملف لا يحتوي على بيانات.', 'err'); return; }
+      pendingImport = rows;
+      const headRow = rows[0] || [];
+      let html = '<table class="w-full"><thead><tr>'+headRow.map(h=>'<th class="border p-1 bg-slate-100">'+escapeHtml(String(h))+'</th>').join('')+'</tr></thead><tbody>';
+      rows.slice(1,11).forEach(r=>{ html += '<tr>'+headRow.map((_,i)=>'<td class="border p-1">'+escapeHtml(String(r[i]??''))+'</td>').join('')+'</tr>'; });
+      html += '</tbody></table>';
+      $('import-preview').innerHTML = html;
+      $('import-preview').classList.remove('hidden');
+      $('apply-import').classList.remove('hidden');
+      showStatus('تمت معاينة الملف، اضغط "اعتماد البيانات المستوردة" لتطبيقها.', 'ok');
+    }catch(err){ showStatus('تعذّرت قراءة الملف: '+err.message, 'err'); }
+  };
+  reader.readAsBinaryString(file);
+});
+$('apply-import').addEventListener('click', ()=>{
+  if(!pendingImport) return;
+  const headRow = pendingImport[0].map(String);
+  const body = pendingImport.slice(1).map(r=>headRow.map((_,i)=>String(r[i]??'')));
+  state.cols = headRow.length; state.rows = body.length || 1;
+  state.headers = headRow;
+  state.data = body.length ? body : [headRow.map(()=>'')];
+  $('column-count').value = state.cols; $('row-count').value = state.rows;
+  renderPaper();
+  $('import-preview').classList.add('hidden'); $('apply-import').classList.add('hidden');
+  showStatus('تم اعتماد بيانات الاستيراد داخل الجدول.', 'ok');
+});
+function escapeHtml(s){ return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function showStatus(msg, type){
+  const el = $('status-message');
+  el.textContent = msg;
+  el.className = 'mb-3 rounded-lg border px-4 py-3 text-sm '+(type==='err' ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700');
+  setTimeout(()=>el.classList.add('hidden-view'), 3500);
+  el.classList.remove('hidden-view');
+}
+
+/* ---------- header block builder (masthead) ---------- */
+function buildMastheadHTML(){
+  const rightLinesHtml = state.rightLines.filter(Boolean).map(l=>escapeHtml(l)).join('<br>');
+  const logoHtml = (state.logoVisible && state.logoSrc)
+    ? '<img src="'+state.logoSrc+'" alt="شعار الجهة">'
+    : '<i data-lucide="building-2" style="width:28px;height:28px;color:#94a3b8;"></i>';
+  return ''
+    +'<header class="report-head">'
+      +'<div style="font-size:'+(state.fontSize)+'px;line-height:1.9;font-weight:600;">'+rightLinesHtml+'</div>'
+      +'<div style="text-align:'+state.titleAlign+';padding-top:2px;">'
+        +'<div style="font-weight:800;font-size:'+state.titleSize+'px;">'+escapeHtml(state.title)+'</div>'
+        +(state.subtitle ? '<div style="font-size:13px;margin-top:4px;color:#5b6b78;">'+escapeHtml(state.subtitle)+'</div>' : '')
+      +'</div>'
+      +'<div class="logo-box">'+logoHtml+'</div>'
+    +'</header>'
+    +'<hr class="divider-line" style="margin-top:8px;">';
+}
+
+/* ---------- table header row builder ---------- */
+function buildTableHeaderRowHTML(){
+  let html = '<tr>';
+  if(state.autoNumber) html += '<th style="width:34px;">م</th>';
+  state.headers.forEach(h=>{ html += '<th>'+escapeHtml(h)+'</th>'; });
+  html += '</tr>';
+  return html;
+}
+
+/* ---------- table body rows builder (editable on screen) ---------- */
+function buildBodyRowsHTML(editable){
+  let html = '';
+  state.data.forEach((row, r)=>{
+    html += '<tr>';
+    if(state.autoNumber) html += '<td style="text-align:center;">'+(r+1)+'</td>';
+    row.forEach((val, c)=>{
+      if(editable){
+        html += '<td class="editable-cell" contenteditable="true" data-r="'+r+'" data-c="'+c+'" style="text-align:'+state.cellAlign+';">'+escapeHtml(val)+'</td>';
+      }else{
+        html += '<td style="text-align:'+state.cellAlign+';">'+escapeHtml(val)+'</td>';
+      }
+    });
+    html += '</tr>';
+  });
+  return html;
+}
+
+/* ---------- signature block builder ---------- */
+function buildSignatureHTML(){
+  if(!state.showFooter) return '';
+  const line = state.signatureLines ? '<div class="signature-line"></div>' : '<div style="height:20px;"></div>';
+  return ''
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:26px;text-align:center;font-size:'+state.fontSize+'px;">'
+      +'<div>'+line+escapeHtml(state.sigRight)+'</div>'
+      +'<div>'+line+escapeHtml(state.sigCenter)+'</div>'
+      +'<div>'+line+escapeHtml(state.sigLeft)+'</div>'
+    +'</div>'
+    +(state.showDate ? '<div class="footer-meta" style="display:flex;justify-content:space-between;margin-top:16px;"><span>التاريخ: ______/______/________</span><span class="print-pagenum">صفحة</span></div>' : '');
+}
+
+/* ---------- live screen paper (editable) ---------- */
+function renderPaper(){
+  const paper = $('paper');
+  paper.className = 'paper size-'+state.size+' orient-'+state.orientation+(state.showBorders?'':' no-borders');
+  paper.style.setProperty('--border-c', state.borderColor);
+  paper.style.setProperty('--head-c', state.headerBg);
+  paper.style.fontFamily = state.fontFamily+', sans-serif';
+  paper.style.fontSize = state.fontSize+'px';
+  paper.style.color = state.fontColor;
+  paper.style.padding = state.margin+'mm';
+  paper.style.borderWidth = state.showBorders ? state.borderWidth+'px' : '0px';
+
+  paper.innerHTML = ''
+    + buildMastheadHTML()
+    + '<div style="height:10px;"></div>'
+    + '<table id="report-table"><thead>'+buildTableHeaderRowHTML()+'</thead><tbody id="report-tbody">'+buildBodyRowsHTML(true)+'</tbody></table>'
+    + buildSignatureHTML();
+
+  if(state.autofit){ paper.querySelector('#report-table').style.tableLayout = 'auto'; }
+  else { paper.querySelector('#report-table').style.tableLayout = 'fixed'; }
+
+  // bind edits back into state
+  paper.querySelectorAll('.editable-cell').forEach(cell=>{
+    cell.addEventListener('input', ()=>{
+      const r = Number(cell.dataset.r), c = Number(cell.dataset.c);
+      state.data[r][c] = cell.textContent;
+    });
+    cell.addEventListener('paste', (e)=>{
+      const text = (e.clipboardData || window.clipboardData).getData('text');
+      if(text && text.includes('\\t')){
+        e.preventDefault();
+        const rows = text.replace(/\\r/g,'').split('\\n').filter(l=>l.length);
+        const startR = Number(cell.dataset.r), startC = Number(cell.dataset.c);
+        rows.forEach((line, ri)=>{
+          const cells = line.split('\\t');
+          cells.forEach((val, ci)=>{
+            const rr = startR+ri, cc = startC+ci;
+            if(state.data[rr] && cc < state.cols){ state.data[rr][cc] = val; }
+          });
+        });
+        renderPaper();
+      }
+    });
+  });
+  paper.querySelectorAll('th').forEach((th, idx)=>{
+    if(state.autoNumber && idx===0) return; // numbering column not editable header
+    const headerIdx = state.autoNumber ? idx-1 : idx;
+    if(headerIdx < 0) return;
+    th.contentEditable = 'true';
+    th.addEventListener('input', ()=>{ state.headers[headerIdx] = th.textContent; });
+  });
+
+  if(window.lucide) lucide.createIcons();
+  $('pagecount-note').textContent = estimatePageCount()+' صفحة تقريبًا عند الطباعة';
+}
+
+/* ---------- pagination estimation & print-page building ---------- */
+const PAGE_MM = {
+  a4:{portrait:[210,297], landscape:[297,210]},
+  a3:{portrait:[297,420], landscape:[420,297]},
+  letter:{portrait:[215.9,279.4], landscape:[279.4,215.9]},
+};
+function mmToPx(mm){ return mm * 96 / 25.4; }
+
+function getContentHeightPx(){
+  const [wmm, hmm] = PAGE_MM[state.size][state.orientation];
+  const pageHpx = mmToPx(hmm);
+  const marginPx = mmToPx(state.margin)*2;
+  return pageHpx - marginPx;
+}
+
+function estimateRowHeightPx(){
+  return Math.max(28, state.fontSize*1.9 + 14);
+}
+
+function estimatePageCount(){
+  const contentH = getContentHeightPx();
+  const mastheadH = state.repeatMasthead ? 130 : 0;
+  const tableHeadH = 40;
+  const sigH = (state.showFooter && state.repeatSignatures) ? 110 : 0;
+  const perPageH = Math.max(120, contentH - mastheadH - tableHeadH - sigH - 30);
+  const rowH = estimateRowHeightPx();
+  const rowsPerPage = Math.max(1, Math.floor(perPageH / rowH));
+  return Math.max(1, Math.ceil(state.rows / rowsPerPage));
+}
+
+/* ---------- build the print/export document ---------- */
+function buildPrintDocument(){
+  const [wmm, hmm] = PAGE_MM[state.size][state.orientation];
+  const contentH = getContentHeightPx();
+  const mastheadH = state.repeatMasthead ? 140 : 0;
+  const tableHeadH = 42;
+  const sigH = (state.showFooter && state.repeatSignatures) ? 120 : 0;
+  const rowH = estimateRowHeightPx();
+  const perPageH = Math.max(150, contentH - mastheadH - tableHeadH - sigH - 20);
+  const rowsPerPage = Math.max(1, Math.floor(perPageH / rowH));
+
+  const pages = [];
+  for(let i=0;i<state.rows;i+=rowsPerPage){
+    pages.push(state.data.slice(i, i+rowsPerPage));
+  }
+  if(pages.length===0) pages.push([]);
+
+  const pageEls = pages.map((chunk, pageIdx)=>{
+    const isFirst = pageIdx===0;
+    const isLast = pageIdx===pages.length-1;
+
+    const mastheadHtml = (isFirst || state.repeatMasthead) ? buildMastheadHTML() : '';
+    const tableHeadHtml = (isFirst || state.repeatHeader) ? buildTableHeaderRowHTML() : '';
+
+    let bodyHtml = '';
+    chunk.forEach((row, ri)=>{
+      const globalIndex = pages.slice(0,pageIdx).reduce((a,p)=>a+p.length,0) + ri;
+      bodyHtml += '<tr>';
+      if(state.autoNumber) bodyHtml += '<td style="text-align:center;">'+(globalIndex+1)+'</td>';
+      row.forEach(val=>{ bodyHtml += '<td style="text-align:'+state.cellAlign+';">'+escapeHtml(val)+'</td>'; });
+      bodyHtml += '</tr>';
+    });
+
+    const showSig = state.showFooter && (isLast || state.repeatSignatures);
+    const sigHtml = showSig ? buildSignatureHTML() : '';
+
+    const paperClasses = 'paper size-'+state.size+' orient-'+state.orientation+(state.showBorders?'':' no-borders');
+    return ''
+      +'<article class="'+paperClasses+'" style="'
+        +'font-family:'+state.fontFamily+',sans-serif;'
+        +'font-size:'+state.fontSize+'px;color:'+state.fontColor+';'
+        +'padding:'+state.margin+'mm;'
+        +'--border-c:'+state.borderColor+';--head-c:'+state.headerBg+';'
+        +'page-break-after:'+(isLast?'auto':'always')+';'
+        +'width:'+mmToPx(wmm)+'px;min-height:'+mmToPx(hmm)+'px;box-shadow:none;margin:0 auto;'
+      +'">'
+        + mastheadHtml
+        + (mastheadHtml ? '<div style="height:10px;"></div>' : '')
+        + (tableHeadHtml || bodyHtml
+            ? '<table style="width:100%;border-collapse:collapse;" '
+              + (state.showBorders ? '' : ' ')
+              + '>'
+              + (tableHeadHtml ? '<thead>'+tableHeadHtml+'</thead>' : '')
+              + '<tbody>'+bodyHtml+'</tbody>'
+              + '</table>'
+            : '')
+        + sigHtml
+      +'</article>';
+  }).join('');
+
+  return {html: pageEls, wmm, hmm};
+}
+
+function injectPrintStyleTable(container){
+  container.querySelectorAll('table').forEach(t=>{
+    t.querySelectorAll('th,td').forEach(cell=>{
+      cell.style.border = state.showBorders ? (state.borderWidth+'px solid '+state.borderColor) : 'none';
+      cell.style.padding = '6px 7px';
+    });
+    t.querySelectorAll('th').forEach(th=>{ th.style.background = state.headerBg; th.style.fontWeight='700'; });
+  });
+}
+
+/* ---------- print ---------- */
+function setPrintPageCSS(){
+  let styleTag = document.getElementById('dynamic-print-page-style');
+  if(!styleTag){
+    styleTag = document.createElement('style');
+    styleTag.id = 'dynamic-print-page-style';
+    document.head.appendChild(styleTag);
+  }
+  const sizeName = state.size==='a4' ? 'A4' : state.size==='a3' ? 'A3' : 'letter';
+  styleTag.textContent = '@page{ size: '+sizeName+' '+state.orientation+'; margin:0; }';
+}
+
+$('print-button').addEventListener('click', doPrint);
+function doPrint(){
+  setPrintPageCSS();
+  const {html} = buildPrintDocument();
+  const root = $('print-root');
+  root.innerHTML = html;
+  injectPrintStyleTable(root);
+  root.classList.remove('hidden-view');
+  if(window.lucide) lucide.createIcons();
+
+  showPrintOverlay();
+
+  // Best-effort automatic print — harmless to try, but not relied upon,
+  // since window.print()/window.open() are commonly blocked inside
+  // sandboxed embeds (e.g. an in-editor app preview) with no error thrown,
+  // they just silently do nothing. The overlay below always gives the
+  // person a working manual path regardless of what the embed allows.
+  setTimeout(()=>{ try{ window.print(); }catch(e){} }, 150);
+}
+
+function showPrintOverlay(){
+  let bar = document.getElementById('print-instruction-bar');
+  if(!bar){
+    bar = document.createElement('div');
+    bar.id = 'print-instruction-bar';
+    bar.style.cssText = 'position:fixed;top:0;right:0;left:0;z-index:9999;background:#112b46;color:#fff;padding:12px 18px;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;font-family:Cairo,sans-serif;font-size:14px;';
+    bar.innerHTML = ''
+      +'<span>إن لم يفتح مربع الطباعة تلقائيًا، اضغط الآن Ctrl+P (أو Cmd+P على ماك) لطباعة هذا العرض.</span>'
+      +'<button id="close-print-overlay" style="background:#fff;color:#112b46;border:0;border-radius:6px;padding:6px 14px;font-weight:700;cursor:pointer;">إغلاق العرض</button>';
+    document.body.appendChild(bar);
+    document.getElementById('close-print-overlay').addEventListener('click', hidePrintOverlay);
+  }
+  bar.style.display = 'flex';
+}
+function hidePrintOverlay(){
+  const bar = document.getElementById('print-instruction-bar');
+  if(bar) bar.style.display = 'none';
+  $('print-root').classList.add('hidden-view');
+  $('print-root').innerHTML = '';
+}
+// NOTE: we deliberately do NOT auto-hide on the 'afterprint' event.
+// In restricted embeds, window.print() can fail silently and still fire
+// 'afterprint' almost immediately, which would wipe the print view before
+// the person has a chance to print it manually (Ctrl+P). The view now only
+// closes when the person clicks "إغلاق العرض" themselves.
+
+/* ---------- PDF export ---------- */
+$('export-pdf-button').addEventListener('click', doExportPdf);
+async function doExportPdf(){
+  showStatus('جارٍ تجهيز ملف PDF...', 'ok');
+  const {html, wmm, hmm} = buildPrintDocument();
+  const root = $('print-root');
+  root.innerHTML = html;
+  injectPrintStyleTable(root);
+  root.style.position='fixed'; root.style.left='-99999px'; root.style.top='0';
+  root.classList.remove('hidden-view');
+  if(window.lucide) lucide.createIcons();
+  await new Promise(r=>setTimeout(r, 80));
+
+  try{
+    const pages = Array.from(root.querySelectorAll(':scope > article'));
+    const orient = state.orientation==='landscape' ? 'l' : 'p';
+    const sizeName = state.size; // jspdf accepts 'a4','a3','letter'
+    const pdf = new jspdf.jsPDF({orientation:orient, unit:'mm', format:sizeName});
+
+    for(let i=0;i<pages.length;i++){
+      const canvas = await html2canvas(pages[i], {scale:2, useCORS:true, backgroundColor:'#ffffff'});
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      if(i>0) pdf.addPage(sizeName, orient);
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      pdf.addImage(imgData, 'JPEG', 0, 0, pageW, pageH);
+    }
+
+    // pdf.save() relies on a synthetic <a download> click, which needs the
+    // "allow-downloads" sandbox permission and silently fails inside some
+    // embeds (e.g. Canva Code's editor preview). Try that first, then fall
+    // back to opening the PDF in a new tab so the person can save it from
+    // their browser's own PDF viewer instead.
+    let autoSaveFailed = false;
+    try{ pdf.save('تقرير.pdf'); }
+    catch(saveErr){ autoSaveFailed = true; }
+
+    const blobUrl = pdf.output('bloburl');
+    const opened = window.open(blobUrl, '_blank');
+    if(!opened && autoSaveFailed){
+      showStatus('تعذّر فتح أو تنزيل PDF تلقائيًا في هذه البيئة. جرّب الموقع بعد نشره (Publish) كصفحة مستقلة، أو افتح الرابط يدويًا.', 'err');
+    }else{
+      showStatus('تم إنشاء ملف PDF. إن لم يبدأ التنزيل تلقائيًا، احفظه من علامة التبويب/العارض الذي فُتح.', 'ok');
+    }
+  }catch(err){
+    showStatus('تعذّر تصدير PDF: '+err.message, 'err');
+  }finally{
+    root.classList.add('hidden-view');
+    root.innerHTML = '';
+    root.style.position=''; root.style.left=''; root.style.top='';
+  }
+}
+
+/* ---------- save / new design ---------- */
+$('save-design-button').addEventListener('click', ()=>{
+  try{
+    localStorage.setItem('report-designer-save', JSON.stringify(state));
+    showStatus('تم حفظ التصميم في هذا المتصفح.', 'ok');
+  }catch(e){ showStatus('تعذّر الحفظ: '+e.message, 'err'); }
+});
+$('new-design-button').addEventListener('click', ()=>{
+  if(confirm('سيتم مسح التصميم الحالي والبدء من جديد، هل تريد المتابعة؟')){
+    Object.assign(state, {
+      cols:5, rows:8, headers:['م','الاسم','الرقم الوظيفي','القسم','الملاحظات'],
+    });
+    seedData();
+    goToStep(1);
+    renderPaper();
+  }
+});
+
+/* ---------- init ---------- */
+if(window.lucide) lucide.createIcons();
+})();
+</script>
+</body>
+</html>
