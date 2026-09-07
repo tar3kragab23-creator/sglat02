@@ -107,7 +107,7 @@ tr{page-break-inside;}
         <div class="bg-white p-5 rounded-xl shadow-2xl text-slate-800 rotate-1">
           <div class="border border-slate-300 rounded-lg p-4">
             <div class="flex justify-between border-b pb-3">
-              <div class="text-xs leading-6 text-slate-600">محافظة: صنعاء<br>مديرية: العاصمة<br>الجهة: الشؤون الإدارية</div>
+              <div class="text-xs leading-6 text-slate-600">مديرية<br>إدارة<br>مدرسة</div>
               <div class="text-center">
                 <div class="font-bold text-lg">كشف بيانات الموظفين</div>
                 <div class="text-xs text-slate-500">للعام الإداري الحالي</div>
@@ -655,56 +655,131 @@ function getContentHeightPx(){
   return pageHpx - marginPx;
 }
 
-function estimateRowHeightPx(){
-  return Math.max(28, state.fontSize*1.9 + 14);
+/* ---------- precise measurement helpers ----------
+   Rather than guessing a fixed row height, we render the real masthead,
+   table header, every data row, and the signature block once in an
+   off-screen probe using the exact same width/fonts/borders as the
+   printed page, then measure their true pixel heights. This lets each
+   page fill up with as many rows as will actually fit before breaking,
+   instead of leaving a large guessed-at blank gap at the bottom. */
+function createProbe(){
+  const probe = document.createElement('div');
+  probe.style.position = 'fixed';
+  probe.style.visibility = 'hidden';
+  probe.style.pointerEvents = 'none';
+  probe.style.left = '-99999px';
+  probe.style.top = '0';
+  probe.style.zIndex = '-1';
+  const [wmm] = PAGE_MM[state.size][state.orientation];
+  const widthPx = mmToPx(wmm) - mmToPx(state.margin) * 2;
+  probe.style.width = widthPx + 'px';
+  probe.style.fontFamily = state.fontFamily + ', sans-serif';
+  probe.style.fontSize = state.fontSize + 'px';
+  probe.style.color = state.fontColor;
+  probe.style.setProperty('--border-c', state.borderColor);
+  probe.style.setProperty('--head-c', state.headerBg);
+  document.body.appendChild(probe);
+  return probe;
+}
+
+function applyProbeCellStyles(probe){
+  probe.querySelectorAll('th,td').forEach(cell=>{
+    cell.style.border = state.showBorders ? (state.borderWidth+'px solid '+state.borderColor) : 'none';
+    cell.style.padding = '6px 7px';
+  });
+  probe.querySelectorAll('th').forEach(th=>{ th.style.background = state.headerBg; th.style.fontWeight='700'; });
+}
+
+/* Measures real block heights, then greedily fills each page with as many
+   rows as fit in the remaining space, checking on every page whether the
+   rows left over would fit as a final page (with the signature block) so
+   the very last page is sized correctly too. */
+function computePagination(){
+  const contentH = getContentHeightPx();
+  const N = state.rows;
+  const probe = createProbe();
+
+  probe.innerHTML = buildMastheadHTML() + '<div style="height:10px;"></div>';
+  if(window.lucide) lucide.createIcons();
+  const mastheadH = probe.getBoundingClientRect().height;
+
+  probe.innerHTML = '<table style="width:100%;border-collapse:collapse;table-layout:'+(state.autofit?'auto':'fixed')+';"><thead>'+buildTableHeaderRowHTML()+'</thead><tbody>'+buildBodyRowsHTML(false)+'</tbody></table>';
+  applyProbeCellStyles(probe);
+  const table = probe.querySelector('table');
+  const tableHeadH = table.querySelector('thead').getBoundingClientRect().height;
+  const tableTop = table.getBoundingClientRect().top;
+  const rowMeta = Array.from(table.querySelectorAll('tbody tr')).map(tr=>{
+    const r = tr.getBoundingClientRect();
+    const top = r.top - tableTop;
+    return { top, bottom: top + r.height };
+  });
+
+  probe.innerHTML = buildSignatureHTML();
+  const sigH = state.showFooter ? probe.getBoundingClientRect().height : 0;
+
+  document.body.removeChild(probe);
+
+  const pages = [];
+  if(N === 0 || rowMeta.length === 0){
+    pages.push({start:0, end:0, mastheadShown:true, headerShown:true, sigShown: state.showFooter});
+    return {pages, mastheadH, tableHeadH, sigH};
+  }
+
+  let idx = 0;
+  while(idx < N){
+    const isFirst = pages.length === 0;
+    const mastheadShown = isFirst || state.repeatMasthead;
+    const headerShown = isFirst || state.repeatHeader;
+    const fixedTop = (mastheadShown ? mastheadH + 10 : 0) + (headerShown ? tableHeadH : 0);
+    const baseTop = rowMeta[idx].top;
+
+    // Would every remaining row fit on this page treated as the last page?
+    const availableAsLast = contentH - fixedTop - (state.showFooter ? sigH : 0);
+    const remainingHeight = rowMeta[N-1].bottom - baseTop;
+
+    if(remainingHeight <= availableAsLast){
+      pages.push({start: idx, end: N, mastheadShown, headerShown, sigShown: state.showFooter});
+      idx = N;
+    } else {
+      const sigNow = (state.showFooter && state.repeatSignatures) ? sigH : 0;
+      const availableNow = contentH - fixedTop - sigNow;
+      let end = idx;
+      while(end < N && (rowMeta[end].bottom - baseTop) <= availableNow){
+        end++;
+      }
+      if(end === idx) end = idx + 1; // always place at least one row to guarantee progress
+      pages.push({start: idx, end, mastheadShown, headerShown, sigShown: sigNow > 0});
+      idx = end;
+    }
+  }
+  return {pages, mastheadH, tableHeadH, sigH};
 }
 
 function estimatePageCount(){
-  const contentH = getContentHeightPx();
-  const mastheadH = state.repeatMasthead ? 130 : 0;
-  const tableHeadH = 40;
-  const sigH = (state.showFooter && state.repeatSignatures) ? 110 : 0;
-  const perPageH = Math.max(120, contentH - mastheadH - tableHeadH - sigH - 30);
-  const rowH = estimateRowHeightPx();
-  const rowsPerPage = Math.max(1, Math.floor(perPageH / rowH));
-  return Math.max(1, Math.ceil(state.rows / rowsPerPage));
+  return computePagination().pages.length;
 }
 
 /* ---------- build the print/export document ---------- */
 function buildPrintDocument(){
   const [wmm, hmm] = PAGE_MM[state.size][state.orientation];
-  const contentH = getContentHeightPx();
-  const mastheadH = state.repeatMasthead ? 140 : 0;
-  const tableHeadH = 42;
-  const sigH = (state.showFooter && state.repeatSignatures) ? 120 : 0;
-  const rowH = estimateRowHeightPx();
-  const perPageH = Math.max(150, contentH - mastheadH - tableHeadH - sigH - 20);
-  const rowsPerPage = Math.max(1, Math.floor(perPageH / rowH));
+  const {pages} = computePagination();
 
-  const pages = [];
-  for(let i=0;i<state.rows;i+=rowsPerPage){
-    pages.push(state.data.slice(i, i+rowsPerPage));
-  }
-  if(pages.length===0) pages.push([]);
+  const pageEls = pages.map((page, pageIdx)=>{
+    const isLast = pageIdx === pages.length - 1;
 
-  const pageEls = pages.map((chunk, pageIdx)=>{
-    const isFirst = pageIdx===0;
-    const isLast = pageIdx===pages.length-1;
-
-    const mastheadHtml = (isFirst || state.repeatMasthead) ? buildMastheadHTML() : '';
-    const tableHeadHtml = (isFirst || state.repeatHeader) ? buildTableHeaderRowHTML() : '';
+    const mastheadHtml = page.mastheadShown ? buildMastheadHTML() : '';
+    const tableHeadHtml = page.headerShown ? buildTableHeaderRowHTML() : '';
 
     let bodyHtml = '';
-    chunk.forEach((row, ri)=>{
-      const globalIndex = pages.slice(0,pageIdx).reduce((a,p)=>a+p.length,0) + ri;
+    for(let r = page.start; r < page.end; r++){
+      const row = state.data[r];
       bodyHtml += '<tr>';
-      if(state.autoNumber) bodyHtml += '<td style="text-align:center;">'+(globalIndex+1)+'</td>';
+      if(state.autoNumber) bodyHtml += '<td style="text-align:center;">'+(r+1)+'</td>';
       row.forEach(val=>{ bodyHtml += '<td style="text-align:'+state.cellAlign+';">'+escapeHtml(val)+'</td>'; });
       bodyHtml += '</tr>';
-    });
+    }
 
-    const showSig = state.showFooter && (isLast || state.repeatSignatures);
-    const sigHtml = showSig ? buildSignatureHTML() : '';
+    const sigHtml = page.sigShown ? buildSignatureHTML() : '';
 
     const paperClasses = 'paper size-'+state.size+' orient-'+state.orientation+(state.showBorders?'':' no-borders');
     return ''
