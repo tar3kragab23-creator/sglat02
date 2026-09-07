@@ -572,16 +572,18 @@ function buildBodyRowsHTML(editable){
 }
 
 /* ---------- signature block builder ---------- */
-function buildSignatureHTML(){
+function buildSignatureHTML(pageNum, totalPages){
   if(!state.showFooter) return '';
   const line = state.signatureLines ? '<div class="signature-line"></div>' : '<div style="height:20px;"></div>';
+  const pn = pageNum || 1;
+  const tp = totalPages || pn;
   return ''
     +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:26px;text-align:center;font-size:'+state.fontSize+'px;">'
       +'<div>'+line+escapeHtml(state.sigRight)+'</div>'
       +'<div>'+line+escapeHtml(state.sigCenter)+'</div>'
       +'<div>'+line+escapeHtml(state.sigLeft)+'</div>'
     +'</div>'
-    +(state.showDate ? '<div class="footer-meta" style="display:flex;justify-content:space-between;margin-top:16px;"><span>التاريخ: ______/______/________</span><span class="print-pagenum">صفحة</span></div>' : '');
+    +(state.showDate ? '<div class="footer-meta" style="display:flex;justify-content:space-between;margin-top:16px;"><span>التاريخ: ______/______/________</span><span class="print-pagenum">صفحة '+pn+' من '+tp+'</span></div>' : '');
 }
 
 /* ---------- live screen paper (editable) ---------- */
@@ -596,11 +598,13 @@ function renderPaper(){
   paper.style.padding = state.margin+'mm';
   paper.style.borderWidth = state.showBorders ? state.borderWidth+'px' : '0px';
 
+  const totalPages = estimatePageCount();
+
   paper.innerHTML = ''
     + buildMastheadHTML()
     + '<div style="height:10px;"></div>'
     + '<table id="report-table"><thead>'+buildTableHeaderRowHTML()+'</thead><tbody id="report-tbody">'+buildBodyRowsHTML(true)+'</tbody></table>'
-    + buildSignatureHTML();
+    + buildSignatureHTML(1, totalPages);
 
   if(state.autofit){ paper.querySelector('#report-table').style.tableLayout = 'auto'; }
   else { paper.querySelector('#report-table').style.tableLayout = 'fixed'; }
@@ -637,7 +641,7 @@ function renderPaper(){
   });
 
   if(window.lucide) lucide.createIcons();
-  $('pagecount-note').textContent = estimatePageCount()+' صفحة تقريبًا عند الطباعة';
+  $('pagecount-note').textContent = totalPages+' صفحة تقريبًا عند الطباعة';
 }
 
 /* ---------- pagination estimation & print-page building ---------- */
@@ -779,7 +783,7 @@ function buildPrintDocument(){
       bodyHtml += '</tr>';
     }
 
-    const sigHtml = page.sigShown ? buildSignatureHTML() : '';
+    const sigHtml = page.sigShown ? buildSignatureHTML(pageIdx+1, pages.length) : '';
 
     const paperClasses = 'paper size-'+state.size+' orient-'+state.orientation+(state.showBorders?'':' no-borders');
     return ''
